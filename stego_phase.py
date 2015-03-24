@@ -6,6 +6,7 @@ import numpy as np
 import wave
 import struct
 from math import *
+import cmath
 
 # http://stackoverflow.com/a/2602334
 def wav_load(fname):
@@ -41,6 +42,15 @@ def chunks(l, n):
     n = max(1, n)
     return [l[i:i + n] for i in range(0, len(l), n)]
 
+
+def arg(z):
+    return atan2(z.imag, z.real)
+
+
+def to_fft_result(amp, ph):
+    return amp * cmath.exp(1j * ph)
+
+
 def main(argv):
 
     input_file_name = 'wav/sinus.wav'
@@ -67,7 +77,17 @@ def main(argv):
         I = len(S)
         # split signal in N segments with K width
         s = chunks(S, K)
-        
+        # FFT
+        delta = [np.fft.rfft(s[n], (K/2)+1) for n in range(0, len(s))]
+        # amplitudes
+        vabs = np.vectorize(abs)
+        amps = [vabs(delta[n]) for n in range(0, len(s))]
+        # phaases
+        varg = np.vectorize(arg)
+        phases = [varg(delta[n]) for n in range(0, len(s))]
+        # inline test
+        # vto_fft_result = np.vectorize(to_fft_result)
+        # delta_test = [vto_fft_result(amps[n], phases[n]) for n in range(0, len(s))]
 
 if __name__ == "__main__":
     main(sys.argv[1:])
