@@ -28,18 +28,17 @@ def wav_load(fname):
     return (nchannels, sampwidth, framerate, nframes, comptype, compname, left, right)
 
 
-def grouper(n, iterable, fillvalue=None):
-    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
-    args = [iter(iterable)] * n
-    return izip_longest(fillvalue=fillvalue, *args)
-
 def wav_save(fname, samples, nchannels=2, sampwidth=2, framerate=44100, nframes=None, comptype='NONE', compname='not compressed',  bufsize=2048):
     wv = wave.open(fname, 'w')
     wv.setparams((nchannels, sampwidth, framerate, nframes, comptype, compname))
-    # split the samples into chunks (to reduce memory consumption and improve performance)
-    for chunk in grouper(bufsize, samples):
-        frames = ''.join(''.join(struct.pack('h', int(sample)) for sample in channels) for channels in chunk if channels is not None)
-        wv.writeframesraw(frames)
+    if nchannels == 2:
+        data = [None]*(len(samples[0])+len(samples[1]))
+        data[::2] = samples[0]
+        data[1::2] = samples[1]
+    else:
+        data = samples[0]
+    frames = struct.pack("%dh" % len(data), *data)
+    wv.writeframesraw(frames)
     wv.close()
 
 
@@ -98,18 +97,18 @@ def b2d(x):
 
 def main(argv):
 
-    input_file_name = 'wav/sinus.wav'
-    M = "Test string!"
     inverse = False
     # wave reading
     # --------------------------------------
-    nchannels, sampwidth, framerate, nframes, comptype, compname, left, right = wav_load(input_file_name)
-    C = left, right
-    Q = sampwidth * 8
-    # plot_signal(left[0:1024], 'Original', 'Time (samples)', 'Amplitude')
-    S = C[0]    # take left channel for msg integration
-    I = len(S)
     if not inverse:
+        input_file_name = 'wav/sinus.wav'
+        M = "Test string!"
+        nchannels, sampwidth, framerate, nframes, comptype, compname, left, right = wav_load(input_file_name)
+        C = left, right
+        Q = sampwidth * 8
+        # plot_signal(left[0:1024], 'Original', 'Time (samples)', 'Amplitude')
+        S = C[0]    # take left channel for msg integration
+        I = len(S)
         print 'stego direct'
         # stego direct
         # --------------------------------------
@@ -175,6 +174,10 @@ def main(argv):
             else:
                 C2[i] = 0
         wav_save("wav/stego.wav", (S_, C2), nchannels, sampwidth, framerate, nframes, comptype, compname)
+    else:
+        # recover msg
+        pass
+
 
 
 
