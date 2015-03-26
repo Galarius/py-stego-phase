@@ -1,102 +1,15 @@
 __author__ = 'galarius'
 
+# to capture console args
 import sys
-import matplotlib.pyplot as plt
-import numpy as np
-import wave
-import struct
+# math functions
 from math import *
-import cmath
-from itertools import *
-
-# http://stackoverflow.com/a/2602334
-def wav_load(fname):
-    wav = wave.open(fname, "r")
-    (nchannels, sampwidth, framerate, nframes, comptype, compname) = wav.getparams()
-    frames = wav.readframes(nframes * nchannels)
-    out = struct.unpack_from("%dh" % nframes * nchannels, frames)
-    wav.close()
-    print("sampling rate = {0} Hz, channels = {1}".format(framerate, nchannels))
-    # Convert 2 channles to numpy arrays
-    if nchannels == 2:
-        left = np.array(list(out[0::2]))
-        right = np.array(list(out[1::2]))
-    else:
-        left = np.array(out)
-        right = left
-
-    return (nchannels, sampwidth, framerate, nframes, comptype, compname, left, right)
-
-
-def wav_save(fname, samples, nchannels=2, sampwidth=2, framerate=44100, nframes=None, comptype='NONE', compname='not compressed',  bufsize=2048):
-    wv = wave.open(fname, 'w')
-    wv.setparams((nchannels, sampwidth, framerate, nframes, comptype, compname))
-    if nchannels == 2:
-        data = [None]*(len(samples[0])+len(samples[1]))
-        data[::2] = samples[0]
-        data[1::2] = samples[1]
-    else:
-        data = samples[0]
-    frames = struct.pack("%dh" % len(data), *data)
-    wv.writeframesraw(frames)
-    wv.close()
-
-
-def plot_signal(audion_data, title, x_lbl, y_lbl):
-    # plot the first 1024 samples
-    plt.plot(audion_data)
-    # label the axes
-    plt.ylabel(y_lbl)
-    plt.xlabel(x_lbl)
-    # set the title
-    plt.title(title)
-    # display the plot
-    plt.show()
-
-# http://stackoverflow.com/a/1751478
-def chunks(l, n):
-    n = max(1, n)
-    return [l[i:i + n] for i in range(0, len(l), n)]
-
-
-def arg(z):
-    return atan2(z.imag, z.real)
-
-
-def to_fft_result(amp, ph):
-    return amp * cmath.exp(1j * ph)
-
-def vec2str(vec):
-    char_vec = [str(unichr(i)) for i in vec]
-    return ''.join(char_vec)
-
-def str2vec(str):
-    return [ord(i) for i in str]
-
-
-def sign(value):
-    if value > 0:
-        return 1
-    elif value < 0:
-        return -1
-    else:
-        return 0
-
-
-def d2b(x, bps):
-    s = sign(x)
-    V = bps * [None]
-    for i in range(0, bps):
-        V[i] = abs(x) % 2
-        x = floor(abs(x)/2)
-    return s * V
-
-
-def b2d(x):
-    s = 0
-    for i in range(1, len(x)):
-        s += x[i]*2**(i-1)
-    return s
+# use numpy
+import numpy as np
+# wav io wrapper module
+import wav_io
+# helper methods for stego operations
+from stego_helpers import *
 
 
 def integrate(source, dest, M):
@@ -106,7 +19,7 @@ def integrate(source, dest, M):
     :param M:       message to hide
     :return:        K - segment width
     """
-    nchannels, sampwidth, framerate, nframes, comptype, compname, left, right = wav_load(source)
+    (nchannels, sampwidth, framerate, nframes, comptype, compname), (left, right) = wav_io.wav_load(source)
     C = left, right
     Q = sampwidth * 8
     # plot_signal(left[0:1024], 'Original', 'Time (samples)', 'Amplitude')
@@ -145,7 +58,7 @@ def integrate(source, dest, M):
         delta_phases[n] = vsub(phases[n], phases[n-1])
     # integrate msg, modify phase
     mvec = str2vec(M)
-    m = [d2b(mvec[t], Q) for t in range(0, len(M))]
+    m = [d2b(mvec[t], 8) for t in range(0, len(M))]
     m = [item for sublist in m for item in sublist]
 
     phase_data = (K/2+1) * [None]
@@ -155,9 +68,9 @@ def integrate(source, dest, M):
                 phase_data[k] = phases[0][k]
             if 0 < k < K/2:
                 if m[k-1] == 1:
-                    phase_data[K/2+1-k] = -pi/2
+                    phase_data[K/2+1-k] = -pi/2.0
                 elif m[k-1] == 0:
-                    phase_data[K/2+1-k] = pi/2
+                    phase_data[K/2+1-k] = pi/2.0
         if k > len(m):
             phase_data[K/2+1-k] = phases[0][K/2+1-k]
     phases_ = len(delta_phases) * [None]
@@ -176,7 +89,7 @@ def integrate(source, dest, M):
             C2[i] = right[i]
         else:
             C2[i] = 0
-    wav_save(dest, (S_, C2), nchannels, sampwidth, framerate, nframes, comptype, compname)
+    wav_io.wav_save(dest, (S_, C2), nchannels, sampwidth, framerate, nframes, comptype, compname)
     return K
 
 
@@ -186,7 +99,7 @@ def deintegrate(source, K):
     :param K:      K - segment width
     :return:       message
     """
-    nchannels, sampwidth, framerate, nframes, comptype, compname, left, right = wav_load(source)
+    (nchannels, sampwidth, framerate, nframes, comptype, compname), (left, right) = wav_io.wav_load(source)
     C = left, right
     Q = sampwidth * 8
     S = C[0]    # take left channel for msg recovering
@@ -223,12 +136,10 @@ def main(argv):
     input_file_name = 'wav/sinus.wav'
     dest_file_name = 'wav/stego.wav'
     message = "Test string!"
-    K = 257 #integrate(input_file_name, dest_file_name, message)
+    K = integrate(input_file_name, dest_file_name, message)
     # recover
     message = deintegrate(dest_file_name, K)
     print message
-
-
 
 if __name__ == "__main__":
     main(sys.argv[1:])
