@@ -44,7 +44,7 @@ def vec2str(vec):
     :param vec: [int, int, ...]
     :return: string
     """
-    char_vec = [str(unichr(i)) for i in vec]
+    char_vec = [chr(i) for i in vec]
     return ''.join(char_vec)
 
 
@@ -57,7 +57,7 @@ def str2vec(str):
     return [ord(i) for i in str]
 
 
-def d2b(x, size):
+def d2b(x, size=8):
     """
     Convert decimal to byte list
     :param x:    decimal
@@ -68,7 +68,7 @@ def d2b(x, size):
     v = size * [None]
     for i in range(0, size):
         v[i] = abs(x) % 2
-        x = floor(abs(x)/2)
+        x = int(floor(abs(x)/2.0))
     return s * v
 
 
@@ -79,6 +79,6 @@ def b2d(x):
     :return:    decimal
     """
     s = 0
-    for i in range(1, len(x)):
-        s += x[i]*2**(i-1)
+    for i in range(0, len(x)):
+        s += x[i]*2**i
     return s

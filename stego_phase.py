@@ -1,3 +1,4 @@
+
 __author__ = 'galarius'
 
 # to capture console args
@@ -10,6 +11,8 @@ import numpy as np
 import wav_io
 # helper methods for stego operations
 from stego_helpers import *
+
+from tests import run_tests
 
 
 def integrate(source, dest, M):
@@ -122,24 +125,26 @@ def deintegrate(source, K):
             b.append(0)
         else:
             break
-    Lm = int(floor(len(b)/8))
+    Lm = int(floor(len(b)/8.0))
     B = chunks(b, 8)
     M = []
-    for i in range(0, len(B)):
+    for i in range(0, Lm):
         M.append(b2d(B[i]))
     return vec2str(M)
 
 
 def main(argv):
 
+    run_tests()
+
     # integrate
     input_file_name = 'wav/sinus.wav'
     dest_file_name = 'wav/stego.wav'
-    message = "Test string!"
+    message = "Test string string string string string string string string string string string string string string string!"
     K = integrate(input_file_name, dest_file_name, message)
     # recover
-    message = deintegrate(dest_file_name, K)
-    print message
+    message_uncovered = deintegrate(dest_file_name, K)
+    print message_uncovered
 
 if __name__ == "__main__":
     main(sys.argv[1:])
