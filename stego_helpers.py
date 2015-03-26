@@ -1,6 +1,5 @@
 __author__ = 'galarius'
 
-import cmath
 from math import atan2, floor
 from numpy import sign
 
@@ -27,18 +26,7 @@ def arg(z):
     return atan2(z.imag, z.real)
 
 
-def to_fft_result(amp, ph):
-    """
-    amplitude * exp(1j * phase) - this is the result of FFT, which may be restored with
-    amp and phase values.
-    :param amp: amplitude
-    :param ph:  phase
-    :return: amplitude * exp(1j * phase)
-    """
-    return amp * cmath.exp(1j * ph)
-
-
-def vec2str(vec):
+def vec_2_str(vec):
     """
     Convert vector of integers to string.
     :param vec: [int, int, ...]
@@ -48,7 +36,7 @@ def vec2str(vec):
     return ''.join(char_vec)
 
 
-def str2vec(str):
+def str_2_vec(str):
     """
     Convert vector of integers to string.
     :param str: string
@@ -57,7 +45,7 @@ def str2vec(str):
     return [ord(i) for i in str]
 
 
-def d2b(x, size=8):
+def d_2_b(x, size=8):
     """
     Convert decimal to byte list
     :param x:    decimal
@@ -72,7 +60,7 @@ def d2b(x, size=8):
     return s * v
 
 
-def b2d(x):
+def b_2_d(x):
     """
     Convert byte list to decimal
     :param x:   byte list

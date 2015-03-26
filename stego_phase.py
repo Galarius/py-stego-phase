@@ -1,149 +1,173 @@
+# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 
-__author__ = 'galarius'
+"""
+The method of phase encoding in audio steganography.
 
+stego_phase.py
+"""
+
+__author__ = 'Ilya Shoshin'
+__copyright__ = 'Copyright 2015, Ilya Shoshin'
+
+#---------------------------------------------------
 # to capture console args
 import sys
 # math functions
 from math import *
+import cmath
 # use numpy
 import numpy as np
 # wav io wrapper module
 import wav_io
 # helper methods for stego operations
 from stego_helpers import *
-
+# run some tests
 from tests import run_tests
+#---------------------------------------------------
 
 
-def integrate(source, dest, M):
+def hide(source, destination, message):
     """
     :param source:  source stego container filename
-    :param dest:    dest stego container filename
-    :param M:       message to hide
-    :return:        K - segment width
+    :param destination:    dest stego container filename
+    :param message:       message to hide
+    :return:        segment_width - segment width
     """
-    (nchannels, sampwidth, framerate, nframes, comptype, compname), (left, right) = wav_io.wav_load(source)
-    C = left, right
-    Q = sampwidth * 8
-    # plot_signal(left[0:1024], 'Original', 'Time (samples)', 'Amplitude')
-    S = C[0]    # take left channel for msg integration
-    I = len(S)
-    print 'stego direct'
-    # stego direct
+    # read wav file
+    (nchannels, sampwidth, framerate, nframes, comptype, compname),\
+    (left, right) = wav_io.wav_load(source)
+    # select channel to hide message in
+    container = left
+    container_len = len(container)
     # --------------------------------------
-    Lm = 8 * len(M)
-    v = int(ceil(log(Lm, 2)+1))
-    K = 2**(v+1)
-    N = int(ceil(I/K))
-    # add silense if nessesary
-    if N > I/K:
-        S = [(S[i] if i < I else 0) for i in range(0, N*K)]
-    I = len(S)
-    # split signal in N segments with K width
-    s = chunks(S, K)
-    # FFT
-    delta = [np.fft.rfft(s[n]) for n in range(0, N)] # -> K/2 + 1
-    # amplitudes
-    vabs = np.vectorize(abs)
-    amps = [vabs(delta[n]) for n in range(0, N)]
-    # phases
-    varg = np.vectorize(arg)
-    phases = [varg(delta[n]) for n in range(0, N)]
-    # inline test
-    #vto_fft_result = np.vectorize(to_fft_result)
-    #delta_test = [vto_fft_result(amps[n], phases[n]) for n in range(0, N)]
+    # prepare container
+    # --------------------------------------
+    message_len = 8 * len(message)          # msg len in bits
+    v = int(ceil(log(message_len, 2)+1))    # get v from equation: 2^v >= 2 * message_len
+    segment_width = 2**(v+1)                # + 1 to reduce container distortion after msg integration
+    segment_count = int(ceil(container_len / segment_width))    # number of segments to split container in
+    # add silence if needed
+    if segment_count > container_len / segment_width:
+        container = [(container[i] if i < container_len else 0) for i in range(0, segment_count*segment_width)]
+    container_len = len(container)          # new container length
+    # split signal in 'segment_count' segments with 'segment_width' width
+    segments = chunks(container, segment_width)
+    # --------------------------------------
+    # apply FFT
+    # --------------------------------------
+    delta = [np.fft.rfft(segments[n]) for n in range(0, segment_count)]  # -> segment_width / 2 + 1
+    # extract amplitudes
+    vabs = np.vectorize(abs)    # apply vectorization
+    amps = [vabs(delta[n]) for n in range(0, segment_count)]
+    # extract phases
+    varg = np.vectorize(arg)    # apply vectorization
+    phases = [varg(delta[n]) for n in range(0, segment_count)]
+    # --------------------------------------
     # save phase subtraction
-    delta_phases = N*[None]
+    delta_phases = segment_count*[None]
     delta_phases[0] = 0 * phases[0]
     def sub (a, b): return a - b
     vsub = np.vectorize(sub)
-    for n in range(1, N):
+    for n in range(1, segment_count):
         delta_phases[n] = vsub(phases[n], phases[n-1])
+    # --------------------------------------
     # integrate msg, modify phase
-    mvec = str2vec(M)
-    m = [d2b(mvec[t], 8) for t in range(0, len(M))]
-    m = [item for sublist in m for item in sublist]
+    msg_vec = str_2_vec(message)
+    msg_bits = [d_2_b(msg_vec[t]) for t in range(0, len(message))]
+    msg_bits = [item for sub_list in msg_bits for item in sub_list]  # msg is a list of bits now
 
-    phase_data = (K/2+1) * [None]
-    for k in range(0, K/2+1):
-        if k <= len(m):
-            if k == 0 or k == K/2:
+    segment_width_half = segment_width / 2
+    phase_data = (segment_width_half + 1) * [None]  # preallocate list where msg will be stored
+    for k in range(0, segment_width_half + 1):
+        if k <= len(msg_bits):
+            if k == 0 or k == segment_width_half:   # do not modify phases at the ends
                 phase_data[k] = phases[0][k]
-            if 0 < k < K/2:
-                if m[k-1] == 1:
-                    phase_data[K/2+1-k] = -pi/2.0
-                elif m[k-1] == 0:
-                    phase_data[K/2+1-k] = pi/2.0
-        if k > len(m):
-            phase_data[K/2+1-k] = phases[0][K/2+1-k]
-    phases_ = len(delta_phases) * [None]
-    phases_[0] = phase_data
-    for n in range(1, N):
-        phases_[n] = (phases_[n-1] + delta_phases[n])
+            if 0 < k < segment_width_half:          # perform integration begining from the hi-freq. components
+                if msg_bits[k-1] == 1:
+                    phase_data[segment_width_half+1-k] = -pi / 2.0
+                elif msg_bits[k-1] == 0:
+                    phase_data[segment_width_half+1-k] = pi / 2.0
+        if k > len(msg_bits):                       # original phase
+            phase_data[segment_width_half+1-k] = phases[0][segment_width_half+1-k]
+    phases_modified = [phase_data]
+    for n in range(1, segment_count):
+        phases_modified.append((phases_modified[n-1] + delta_phases[n]))
+    # --------------------------------------
+    # convert data back to the frequency domain: amplitude * exp(1j * phase)
+    def to_frequency_domain (amp, ph): return amp * cmath.exp(1j * ph)
+    vto_fft_result = np.vectorize(to_frequency_domain)
+    delta_modified = [vto_fft_result(amps[n], phases_modified[n]) for n in range(0, segment_count)]
     # restore segments
-    vto_fft_result = np.vectorize(to_fft_result)
-    delta_ = [vto_fft_result(amps[n], phases_[n]) for n in range(0, N)]
-    s_= [np.fft.irfft(delta_[n]) for n in range(0, N)]
+    segments_modified = [np.fft.irfft(delta_modified[n]) for n in range(0, segment_count)]
     # join segments
-    S_ = [item for sublist in s_ for item in sublist]
-    C2 = len(S_) * [None]
-    for i in range(0, len(S_)):
-        if i <= len(right):
-            C2[i] = right[i]
+    container_modified = [item for sub_list in segments_modified for item in sub_list]
+    # sync the size of unmodified channel with the size of modified one
+    right_synced = len(container_modified) * [None]
+    for i in range(0, len(container_modified)):
+        if i < len(right):
+            right_synced[i] = right[i]
         else:
-            C2[i] = 0
-    wav_io.wav_save(dest, (S_, C2), nchannels, sampwidth, framerate, nframes, comptype, compname)
-    return K
+            right_synced[i] = 0
+    # --------------------------------------
+    # save stego container with integrated message in freq. scope as wav file
+    wav_io.wav_save(destination, (container_modified, right_synced),
+                    nchannels, sampwidth, framerate, nframes, comptype, compname)
+    # to recover the message the one must know the segment width, used in the process
+    return segment_width
 
 
-def deintegrate(source, K):
+def recover(source, segment_width):
     """
     :param source: filename for the file with integrated message
-    :param K:      K - segment width
-    :return:       message
+    :param segment_width: segment width
+    :return: message
     """
-    (nchannels, sampwidth, framerate, nframes, comptype, compname), (left, right) = wav_io.wav_load(source)
-    C = left, right
-    Q = sampwidth * 8
-    S = C[0]    # take left channel for msg recovering
-    I = len(S)
-    N = int(I/K)
-    # split signal in N segments with K width
-    s = chunks(S, K)
-    # FFT
-    delta = [None] * N
-    delta[0] = np.fft.rfft(s[0])
-    phases = [None] * N
-    varg = np.vectorize(arg)
-    phases[0] = varg(delta[0])
+    # read wav file with integrated message
+    (nchannels, sampwidth, framerate, nframes, comptype, compname),\
+    (left, right) = wav_io.wav_load(source)
+    container = left    # take left channel for msg recovering
+    container_len = len(container)
+    # --------------------------------------
+    # prepare container
+    segment_count = int(container_len / segment_width)
+    # split signal in 'segment_count' segments with 'width' width
+    segments = chunks(container, segment_width)
+    # --------------------------------------
+    # apply FFT
+    delta = [np.fft.rfft(segments[0])]
+    # extract phases
+    varg = np.vectorize(arg)    # apply vectorization
+    phases = [varg(delta[0])]
+    phases_0_len = len(phases[0])
     b = []
-    for t in range(0, K/2):
-        d = phases[0][len(phases[0])-1-t]
+    for t in range(0, segment_width / 2):
+        d = phases[0][phases_0_len-1-t]
         if d < -pi/3.0:
             b.append(1)
         elif d > pi/3.0:
             b.append(0)
         else:
             break
-    Lm = int(floor(len(b)/8.0))
-    B = chunks(b, 8)
-    M = []
-    for i in range(0, Lm):
-        M.append(b2d(B[i]))
-    return vec2str(M)
+    msg_bits_len = int(floor(len(b) / 8.0))
+    msg_bits_splitted = chunks(b, 8)
+    msg_vec = []
+    for i in range(0, msg_bits_len):
+        msg_vec.append(b_2_d(msg_bits_splitted[i]))
+    return vec_2_str(msg_vec)
 
 
 def main(argv):
 
+    # run tests
     run_tests()
-
-    # integrate
+    # hide
     input_file_name = 'wav/sinus.wav'
     dest_file_name = 'wav/stego.wav'
     message = "Test string string string string string string string string string string string string string string string!"
-    K = integrate(input_file_name, dest_file_name, message)
+    segment_width = hide(input_file_name, dest_file_name, message)
     # recover
-    message_uncovered = deintegrate(dest_file_name, K)
+    message_uncovered = recover(dest_file_name, segment_width)
     print message_uncovered
 
 if __name__ == "__main__":
