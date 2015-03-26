@@ -24,7 +24,7 @@ def wav_load(file_name):
     frames = wav.readframes(nframes * nchannels)
     out = struct.unpack_from("%dh" % nframes * nchannels, frames)
     wav.close()
-    print("sampling rate = {0} Hz, channels = {1}".format(framerate, nchannels))
+    # print("sampling rate = {0} Hz, channels = {1}".format(framerate, nchannels))
     # Convert 2 channels to numpy arrays
     if nchannels == 2:
         left = np.array(list(out[0::2]))

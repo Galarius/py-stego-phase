@@ -12,7 +12,7 @@ __copyright__ = 'Copyright 2015, Ilya Shoshin'
 
 #---------------------------------------------------
 # to capture console args
-import sys
+import sys, getopt
 # math functions
 from math import *
 import cmath
@@ -35,6 +35,7 @@ def hide(source, destination, message):
     :return:        segment_width - segment width
     """
     # read wav file
+    print 'reading wave container...'
     (nchannels, sampwidth, framerate, nframes, comptype, compname),\
     (left, right) = wav_io.wav_load(source)
     # select channel to hide message in
@@ -43,6 +44,7 @@ def hide(source, destination, message):
     # --------------------------------------
     # prepare container
     # --------------------------------------
+    print 'preparing container...'
     message_len = 8 * len(message)          # msg len in bits
     v = int(ceil(log(message_len, 2)+1))    # get v from equation: 2^v >= 2 * message_len
     segment_width = 2**(v+1)                # + 1 to reduce container distortion after msg integration
@@ -56,6 +58,7 @@ def hide(source, destination, message):
     # --------------------------------------
     # apply FFT
     # --------------------------------------
+    print 'performing fft transform...'
     delta = [np.fft.rfft(segments[n]) for n in range(0, segment_count)]  # -> segment_width / 2 + 1
     # extract amplitudes
     vabs = np.vectorize(abs)    # apply vectorization
@@ -73,6 +76,7 @@ def hide(source, destination, message):
         delta_phases[n] = vsub(phases[n], phases[n-1])
     # --------------------------------------
     # integrate msg, modify phase
+    print 'msg integration...'
     msg_vec = str_2_vec(message)
     msg_bits = [d_2_b(msg_vec[t]) for t in range(0, len(message))]
     msg_bits = [item for sub_list in msg_bits for item in sub_list]  # msg is a list of bits now
@@ -83,7 +87,7 @@ def hide(source, destination, message):
         if k <= len(msg_bits):
             if k == 0 or k == segment_width_half:   # do not modify phases at the ends
                 phase_data[k] = phases[0][k]
-            if 0 < k < segment_width_half:          # perform integration begining from the hi-freq. components
+            if 0 < k < segment_width_half:          # perform integration begining with the hi-freq. components
                 if msg_bits[k-1] == 1:
                     phase_data[segment_width_half+1-k] = -pi / 2.0
                 elif msg_bits[k-1] == 0:
@@ -111,9 +115,11 @@ def hide(source, destination, message):
             right_synced[i] = 0
     # --------------------------------------
     # save stego container with integrated message in freq. scope as wav file
+    print 'saving stego container...'
     wav_io.wav_save(destination, (container_modified, right_synced),
                     nchannels, sampwidth, framerate, nframes, comptype, compname)
     # to recover the message the one must know the segment width, used in the process
+    print "\nDone.\n"
     return segment_width
 
 
@@ -124,28 +130,34 @@ def recover(source, segment_width):
     :return: message
     """
     # read wav file with integrated message
+    print 'reading wave container...'
     (nchannels, sampwidth, framerate, nframes, comptype, compname),\
     (left, right) = wav_io.wav_load(source)
     container = left    # take left channel for msg recovering
     container_len = len(container)
     # --------------------------------------
     # prepare container
+    print 'preparing container...'
     segment_count = int(container_len / segment_width)
     # split signal in 'segment_count' segments with 'width' width
     segments = chunks(container, segment_width)
     # --------------------------------------
     # apply FFT
+    print 'performing fft transform...'
     delta = [np.fft.rfft(segments[0])]
     # extract phases
     varg = np.vectorize(arg)    # apply vectorization
     phases = [varg(delta[0])]
     phases_0_len = len(phases[0])
+    # --------------------------------------
+    # recover message
+    print 'recovering message...'
     b = []
     for t in range(0, segment_width / 2):
         d = phases[0][phases_0_len-1-t]
-        if d < -pi/3.0:
+        if d < -pi / 3.0:
             b.append(1)
-        elif d > pi/3.0:
+        elif d > pi / 3.0:
             b.append(0)
         else:
             break
@@ -154,21 +166,77 @@ def recover(source, segment_width):
     msg_vec = []
     for i in range(0, msg_bits_len):
         msg_vec.append(b_2_d(msg_bits_splitted[i]))
-    return vec_2_str(msg_vec)
+    message = vec_2_str(msg_vec)
+    print "\nDone.\n"
+    return message
+
+
+def print_usage():
+    print """
+          hide msg:    stego_phase.py -i <input_container_file_name> -m <message_file_name> -o <output_container_file_name>
+          recover msg: stego_phase.py -i <input_container_file_name> -m <message_file_name> -k <segment_width>
+          """
 
 
 def main(argv):
 
     # run tests
-    run_tests()
-    # hide
-    input_file_name = 'wav/sinus.wav'
-    dest_file_name = 'wav/stego.wav'
-    message = "Test string string string string string string string string string string string string string string string!"
-    segment_width = hide(input_file_name, dest_file_name, message)
-    # recover
-    message_uncovered = recover(dest_file_name, segment_width)
-    print message_uncovered
+    # run_tests()
+
+    input_container_file_name = ''
+    message_file_name = ''
+    output_container_file_name = ''
+    segment_width = -1
+    # --------------------------------------
+    try:
+       opts, args = getopt.getopt(argv, "hi:m:o:k", ["ifile=", "mfile=", "ofile=", "karg="])
+    except getopt.GetoptError:
+       print_usage()
+       sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_usage()
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            input_container_file_name = arg
+        elif opt in ("-m", "--mfile"):
+            message_file_name = arg
+        elif opt in ("-o", "--ofile"):
+            output_container_file_name = arg
+        elif opt in ("-k", "--karg"):
+            segment_width = int(arg)
+
+    if input_container_file_name == '':
+        print_usage()
+        sys.exit()
+
+    if not output_container_file_name == '':
+        # --------------------------------------
+        # hide
+        # --------------------------------------
+        message = ''
+        try:
+            with open(message_file_name, "r") as reader:
+                message = reader.read()
+        except IOError as e:
+            print "I/O error({0}): {1}".format(e.errno, e.strerror)
+        if not message == '':
+            segment_width = hide(input_container_file_name, output_container_file_name, message)
+            print "Remember segment width to recover message: {0}".format(segment_width)
+        # --------------------------------------
+    elif segment_width > 0:
+        # --------------------------------------
+        # recover
+        # --------------------------------------
+        message = recover(input_container_file_name, segment_width)
+        try:
+            with open(message_file_name, "w") as writer:
+                writer.write(message)
+        except IOError as e:
+            print "I/O error({0}): {1}".format(e.errno, e.strerror)
+        # --------------------------------------
+    else:
+        print_usage()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
