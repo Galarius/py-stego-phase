@@ -26,7 +26,6 @@ from stego_helpers import *
 from tests import run_tests
 #---------------------------------------------------
 
-
 def hide(source, destination, message):
     """
     :param source:  source stego container filename
@@ -182,6 +181,15 @@ def main(argv):
 
     # run tests
     # run_tests()
+    # debug
+    # input_container_file_name = "wav/stego.wav"
+    # message_file_name = "msg/msg_recovered.txt"
+    # segment_width = 1024
+    # message = recover(input_container_file_name, segment_width)
+    # print message
+    # return
+    # python stego_phase.py -i "wav/beat.wav" -m "msg/msg.txt" -o "wav/stego.wav"
+    # python stego_phase.py -i "wav/stego.wav" -m "msg/msg_recovered.txt" -k 1024
 
     input_container_file_name = ''
     message_file_name = ''
@@ -189,7 +197,7 @@ def main(argv):
     segment_width = -1
     # --------------------------------------
     try:
-       opts, args = getopt.getopt(argv, "hi:m:o:k", ["ifile=", "mfile=", "ofile=", "karg="])
+       opts, args = getopt.getopt(argv, "hi:m:o:k:", ["ifile=", "mfile=", "ofile=", "karg="])
     except getopt.GetoptError:
        print_usage()
        sys.exit(2)

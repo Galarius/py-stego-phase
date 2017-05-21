@@ -2,7 +2,7 @@ __author__ = 'galarius'
 
 from math import atan2, floor
 from numpy import sign
-
+import numpy as np
 
 def chunks(l, n):
     """
