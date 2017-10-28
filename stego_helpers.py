@@ -1,7 +1,9 @@
-__author__ = 'galarius'
+# -*- coding: utf-8 -*-
+
+__author__ = 'Ilya Shoshin (Galarius)'
+__copyright__ = 'Copyright 2015, Ilya Shoshin (Galarius)'
 
 from math import atan2, floor
-from numpy import sign
 import numpy as np
 
 def chunks(l, n):
@@ -52,7 +54,7 @@ def d_2_b(x, size=8):
     :param size: the size of byte list
     :return: e.g. [0, 0, 1, ...]
     """
-    s = sign(x)
+    s = np.sign(x)
     v = size * [None]
     for i in range(0, size):
         v[i] = abs(x) % 2

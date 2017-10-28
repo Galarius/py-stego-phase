@@ -7,8 +7,12 @@ The method of phase encoding in audio steganography.
 stego_phase.py
 """
 
-__author__ = 'Ilya Shoshin'
-__copyright__ = 'Copyright 2015, Ilya Shoshin'
+__author__ = 'Ilya Shoshin (Galarius)'
+__copyright__ = 'Copyright 2015, Ilya Shoshin (Galarius)'
+
+# Examples:
+# python stego_phase.py -i "wav/beat.wav" -m "msg/msg.txt" -o "wav/stego.wav"
+# python stego_phase.py -i "wav/stego.wav" -m "msg/msg_recovered.txt" -k 1024
 
 #---------------------------------------------------
 # to capture console args
@@ -178,19 +182,6 @@ def print_usage():
 
 
 def main(argv):
-
-    # run tests
-    # run_tests()
-    # debug
-    # input_container_file_name = "wav/stego.wav"
-    # message_file_name = "msg/msg_recovered.txt"
-    # segment_width = 1024
-    # message = recover(input_container_file_name, segment_width)
-    # print message
-    # return
-    # python stego_phase.py -i "wav/beat.wav" -m "msg/msg.txt" -o "wav/stego.wav"
-    # python stego_phase.py -i "wav/stego.wav" -m "msg/msg_recovered.txt" -k 1024
-
     input_container_file_name = ''
     message_file_name = ''
     output_container_file_name = ''

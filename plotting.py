@@ -1,4 +1,7 @@
-__author__ = 'galarius'
+# -*- coding: utf-8 -*-
+
+__author__ = 'Ilya Shoshin (Galarius)'
+__copyright__ = 'Copyright 2015, Ilya Shoshin (Galarius)'
 
 import matplotlib.pyplot as plt
 

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+
+__author__ = 'Ilya Shoshin (Galarius)'
+__copyright__ = 'Copyright 2015, Ilya Shoshin (Galarius)'
+
 import wave
 import struct
 import numpy as np
